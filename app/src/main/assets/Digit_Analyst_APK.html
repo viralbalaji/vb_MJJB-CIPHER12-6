@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024">
+    <script>history.scrollRestoration = 'manual';</script>
+    <title>Digit Analysis Tool</title>
+
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        textarea, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .addition-note {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .results-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .result-panel {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .formula {
+            font-family: monospace;
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+        .step {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .step:last-child {
+            border-bottom: none;
+        }
+        .highlight {
+            background-color: #fffacd;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .final-result {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f4fc;
+            border-radius: 5px;
+        }
+        .summary-pre {
+            background: #f0f0f0;
+            padding: 10px;
+            white-space: pre-wrap;
+            font-size: 16px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-top: 30px;
+        }
+        .input-row {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        .input-row > div {
+            flex: 1;
+        }
+        .original-value {
+            color: #666;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        .sci-calc {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #27ae60;
+}
+
+.sci-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.sci-input-group input {
+    flex: 1;
+}
+.sci-result {
+    font-family: monospace;
+    background-color: #f1f1f1;
+    padding: 15px;
+    border-radius: 4px;
+    font-size: 16px;
+    word-break: break-all;
+}
+.arithmetic-calc {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #e74c3c;
+}
+.arithmetic-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+.arithmetic-inputs input {
+    flex: 1;
+    min-width: 120px;
+}
+.arithmetic-inputs select {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+}
+#multiplierResult {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>MJJB's Digit Analysis Tool</h1>
+        
+        <div class="input-group">
+            <label for="inputText">Enter a number or any string:</label>
+            <textarea id="inputText" placeholder="Type or paste your string here..."></textarea>
+            
+            <div class="input-row">
+                <div>
+                    <label for="additionValue">Add to number:</label>
+                    <textarea id="additionValue" placeholder="Enter a number to add (optional)"></textarea>
+                    <div class="addition-note">Only digits will be extracted from your input before adding</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="results-container">
+            <div class="result-panel">
+                <h2>Digit Summary</h2>
+                <pre id="summary" class="summary-pre">Enter text to see digit summary</pre>
+            </div>
+            
+            <div class="result-panel">
+                <h2>Multiplier Calculator</h2>
+                <div id="multiplierResult">
+                    <p>Enter a number to calculate the maximum multiplier</p>
+                </div>
+            </div>
+        </div>
+        <div class="sci-calc">
+            <h2>Scientific Notation Converter</h2>
+            <p>Convert numbers with 'e' notation to full decimal format (auto-converts):</p>
+            
+            <div class="sci-input-group">
+                <input type="text" id="sciInput" placeholder="Enter number like 1.4496955639315744e+35">
+            </div>
+            
+            <div id="sciResult" class="sci-result">Enter a number to convert</div>
+        </div>
+        <div class="arithmetic-calc">
+            <h2>Arithmetic Calculator</h2>
+            <p>Perform arithmetic operations with large numbers (auto-converts results):</p>
+            
+            <div class="arithmetic-inputs">
+                <input type="number" id="arithmetic1" placeholder="First number">
+                <select id="arithmeticOperator">
+                    <option value="+">+</option>
+                    <option value="-">-</option>
+                    <option value="*">×</option>
+                    <option value="/">÷</option>
+                </select>
+                <input type="number" id="arithmetic2" placeholder="Second number">
+            </div>
+            
+            <div id="arithmeticResult" class="sci-result">Enter numbers to calculate</div>
+        </div>
+        <div class="container">
+            <div class="repeat-calc" style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 5px; border-left: 4px solid #9b59b6;">
+                <h2>Number Repeater</h2>
+                <p>Enter a number and how many times to repeat it:</p>
+                
+                <div class="input-group">
+                    <label for="repeatNumber">Number to repeat (digits only):</label>
+                    <input type="text" id="repeatNumber" placeholder="Enter number like 1, 5, 42, etc.">
+                </div>
+                
+                <div class="input-group">
+                    <label for="repeatCount">How many times to repeat:</label>
+                    <input type="number" id="repeatCount" placeholder="Enter count like 5, 10, etc." min="1" max="1000">
+                </div>
+                
+                <div id="repeatResult" class="sci-result" style="margin-top: 15px;">Enter number and count to see result</div>
+            </div>
+        </div>
+        <div class="container">
+            <div class="entropy-calc" style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 5px; border-left: 4px solid #e67e22;">
+                <h2>Entropy Calculator</h2>
+                <p><strong>4P 143D 4P 17D</strong>  (P=possibilities, D=digits, A= CAPITAL & SMALL ALPHAs, S= *,/ )</p>
+                
+                <div class="input-group">
+                    <label for="entropyInput">Entropy components:</label>
+                    <input type="text" id="entropyInput" placeholder="Example: 4P 143D 4P 17D" style="width: 100%;">
+                </div>
+                
+                <div id="entropyResult" class="sci-result" style="margin-top: 15px; white-space: pre-wrap;">Enter components to calculate entropy</div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.getElementById('inputText').addEventListener('input', function() {
+            updateCalculations();
+        });
+        
+        document.getElementById('additionValue').addEventListener('input', function() {
+            updateCalculations();
+        });
+
+        function updateCalculations() {
+            updateSummary();
+            calculateMultiplier();
+        }
+
+        function getProcessedNumber() {
+    const input = document.getElementById("inputText").value;
+    const additionValue = document.getElementById("additionValue").value;
+    
+    // Extract only digits from input
+    const inputDigits = input.replace(/\D/g, '');
+    
+    // Extract only digits from addition value
+    const additionDigits = additionValue.replace(/\D/g, '');
+    
+    let processedNumber = '';
+    let originalNumber = '';
+    let additionApplied = false;
+    
+    // Case 1: Both input and addition have values
+    if (inputDigits && additionDigits) {
+        processedNumber = (BigInt(inputDigits) + BigInt(additionDigits)).toString();
+        originalNumber = inputDigits;
+        additionApplied = true;
+    }
+    // Case 2: Only addition value is provided (main input is empty)
+    else if (!inputDigits && additionDigits) {
+        processedNumber = additionDigits;
+        originalNumber = '0';
+        additionApplied = true;
+    }
+    // Case 3: Only main input is provided
+    else if (inputDigits && !additionDigits) {
+        processedNumber = inputDigits;
+        originalNumber = inputDigits;
+        additionApplied = false;
+    }
+    // Case 4: Only main input is provided and no addition
+    else if (inputDigits) {
+        processedNumber = inputDigits;
+        originalNumber = inputDigits;
+        additionApplied = false;
+    }
+    
+    return {
+        processedNumber: processedNumber,
+        originalNumber: originalNumber,
+        additionApplied: additionApplied
+    };
+}
+
+function updateSummary() {
+    const { processedNumber, originalNumber, additionApplied } = getProcessedNumber();
+    
+    if (!processedNumber) {
+        document.getElementById("summary").textContent = "Enter text to see digit summary";
+        return;
+    }
+    
+    // Use padded number for display and digit counting
+    const paddedNumber = additionApplied ? processedNumber.padStart(originalNumber.length, '0') : processedNumber;
+    
+    // Extract all digits from padded number for display
+    const digits = paddedNumber.match(/\d/g) || [];
+    
+    const totalDigits = paddedNumber.length;
+    const counts = {};
+    
+    // Initialize counts 0-9
+    for (let i = 0; i <= 9; i++) counts[i] = 0;
+    
+    // Count each digit
+    digits.forEach(d => counts[d]++);
+    
+    const zeros = counts[0];
+    const nonZeros = totalDigits - zeros;
+    
+    // Build breakdown string
+    let breakdownStr = '';
+    for (let i = 0; i <= 9; i++) {
+        breakdownStr += `${i} : ${counts[i]}\n`;
+    }
+    
+    let summaryStr = `Total digits: ${totalDigits}\n\n`;
+
+    if (additionApplied) {
+    const additionDigits = document.getElementById('additionValue').value.replace(/\D/g, '');
+    const additionZeros = (additionDigits.match(/0/g) || []).length;
+    
+    summaryStr += `Original number: ${originalNumber}\n`;
+    summaryStr += `Added: ${additionDigits}\n`;
+    summaryStr += `After addition: ${paddedNumber}\n\n`;
+}
+
+    summaryStr += `Breakdown:\n${breakdownStr}\n`;
+    summaryStr += `Zeros: ${zeros}\n`;
+    summaryStr += `Non-zero digits: ${nonZeros}\n`;
+    summaryStr += `Total digits: ${totalDigits}`;
+    
+    document.getElementById("summary").textContent = summaryStr;
+}
+
+
+// Arithmetic calculator function
+// Arithmetic calculator function
+function calculateArithmetic() {
+    const num1 = document.getElementById('arithmetic1').value.trim();
+    const num2 = document.getElementById('arithmetic2').value.trim();
+    const operator = document.getElementById('arithmeticOperator').value;
+    const resultElement = document.getElementById('arithmeticResult');
+    
+    if (!num1 || !num2) {
+        resultElement.textContent = 'Enter both numbers to calculate';
+        return;
+    }
+    
+    try {
+        let result;
+        
+        // Check if numbers are too large for regular arithmetic
+        if (num1.length > 15 || num2.length > 15 || num1.includes('e') || num2.includes('e')) {
+            // Use BigInt for large numbers or scientific notation
+            const n1 = BigInt(num1.includes('e') ? convertScientificToBigInt(num1) : num1);
+            const n2 = BigInt(num2.includes('e') ? convertScientificToBigInt(num2) : num2);
+            
+            switch (operator) {
+                case '+': result = n1 + n2; break;
+                case '-': result = n1 - n2; break;
+                case '*': result = n1 * n2; break;
+                case '/': 
+                    if (n2 === 0n) {
+                        resultElement.textContent = 'Error: Division by zero';
+                        return;
+                    }
+                    result = n1 / n2; 
+                    break;
+            }
+            result = result.toString();
+        } else {
+            // Use regular numbers for smaller values
+            const n1 = parseFloat(num1);
+            const n2 = parseFloat(num2);
+            
+            if (isNaN(n1) || isNaN(n2)) {
+                resultElement.textContent = 'Invalid numbers entered';
+                return;
+            }
+            
+            switch (operator) {
+                case '+': result = n1 + n2; break;
+                case '-': result = n1 - n2; break;
+                case '*': result = n1 * n2; break;
+                case '/': 
+                    if (n2 === 0) {
+                        resultElement.textContent = 'Error: Division by zero';
+                        return;
+                    }
+                    result = n1 / n2; 
+                    break;
+            }
+            result = result.toString();
+        }
+        
+        // Display result ONLY (don't auto-fill any other fields)
+        resultElement.textContent = `Result: ${result}`;
+        
+    } catch (error) {
+        resultElement.textContent = 'Error in calculation: ' + error.message;
+    }
+}
+
+// Helper function to convert scientific notation to BigInt string
+function convertScientificToBigInt(sciNotation) {
+    if (!sciNotation.includes('e') && !sciNotation.includes('E')) {
+        return sciNotation;
+    }
+    
+    const [coefficient, exponent] = sciNotation.split(/e\+|e\-/i);
+    const isNegativeExponent = sciNotation.includes('e-');
+    const expValue = parseInt(exponent);
+    
+    let coefficientNum = coefficient.replace('.', '');
+    const decimalIndex = coefficient.indexOf('.');
+    const decimalPlaces = decimalIndex === -1 ? 0 : coefficient.length - decimalIndex - 1;
+    
+    if (isNegativeExponent) {
+        // Handle negative exponents (very small numbers - not suitable for BigInt)
+        return '0';
+    } else {
+        // Handle positive exponents (very large numbers)
+        const zerosNeeded = expValue - decimalPlaces;
+        
+        if (zerosNeeded >= 0) {
+            return coefficientNum + '0'.repeat(zerosNeeded);
+        } else {
+            // Need to insert decimal point - not suitable for BigInt
+            const insertIndex = coefficientNum.length + zerosNeeded;
+            return coefficientNum.slice(0, insertIndex); // Return integer part only
+        }
+    }
+}
+
+// Update the calculateMultiplier function to auto-fill scientific notation
+function calculateMultiplier() {
+    const { processedNumber, originalNumber, additionApplied } = getProcessedNumber();
+    
+    // If no valid number, show message
+    if (!processedNumber) {
+        document.getElementById('multiplierResult').innerHTML = 
+            '<p>Enter a number to calculate the maximum multiplier</p>';
+        // Clear both fields
+        document.getElementById('sciInput').value = '';
+        document.getElementById('sciResult').textContent = 'Enter a number to convert';
+        document.getElementById('arithmetic1').value = '';
+        document.getElementById('arithmeticResult').textContent = 'Enter both numbers to calculate';
+        return;
+    }
+    
+    // Use padded number for calculation to match the displayed digit count
+    const paddedNumber = additionApplied ? processedNumber.padStart(originalNumber.length, '0') : processedNumber.padStart(originalNumber.length, '0');
+    const displayNumber = paddedNumber;
+    
+    // Convert to BigInt - use the PADDED number for calculation
+    const N = BigInt(paddedNumber);
+    const digitCount = paddedNumber.length;
+    
+    // Calculate maximum multiplier
+    // We need: k × N < 10^digitCount
+    // So: k < 10^digitCount / N
+    const powerOfTen = BigInt(10) ** BigInt(digitCount);
+    const maxMultiplier = powerOfTen / N;
+    
+    // Convert to number and check if it's in scientific notation
+    const maxMultiplierNum = Number(maxMultiplier);
+    const maxMultiplierStr = maxMultiplierNum.toString();
+    
+    // Display results
+    let resultHTML = '';
+    
+    if (additionApplied) {
+        const additionDigits = document.getElementById('additionValue').value.replace(/\D/g, '');
+        const additionZeros = (additionDigits.match(/0/g) || []).length;
+        resultHTML += `
+            <div class="step">
+                <strong>Step 1: Extract digits and apply addition</strong><br>
+                Original: ${originalNumber}<br>
+                Added: ${additionDigits}<br>
+                Result: <span class="highlight">${displayNumber}</span>
+            </div>
+        `;
+    } else {
+        resultHTML += `
+            <div class="step">
+                <strong>Step 1: Extract digits from input</strong><br>
+                Result: <span class="highlight">${displayNumber}</span>
+            </div>
+        `;
+    }
+    
+    resultHTML += `
+        <div class="step">
+            <strong>Step 2: Count digits</strong><br>
+            Number of digits: <span class="highlight">${digitCount}</span>
+        </div>
+        <div class="step">
+            <strong>Step 3: Set up inequality</strong><br>
+            We need: k × N < 10<sup>${digitCount}</sup><br>
+            <div class="formula">k < 10<sup>${digitCount}</sup> / N</div>
+        </div>
+        <div class="step">
+            <strong>Step 4: Calculate values</strong><br>
+            10<sup>${digitCount}</sup> = ${powerOfTen.toString()}<br>
+            N = ${N.toString()}<br>
+            <div class="formula">10<sup>${digitCount}</sup> / N ≈ ${(Number(powerOfTen) / Number(N)).toFixed(5)}</div>
+        </div>
+        <div class="final-result">
+            Maximum multiplier k = <span class="highlight">${maxMultiplierStr}</span><br>
+            <small>This keeps k × N at ${digitCount} digits</small>
+        </div>
+    `;
+    
+    document.getElementById('multiplierResult').innerHTML = resultHTML;
+
+    document.getElementById('arithmetic2').value = displayNumber;
+   
+       // Auto-fill scientific notation converter if multiplier is in scientific notation
+       if (maxMultiplierStr.includes('e') || maxMultiplierStr.includes('E')) {
+        document.getElementById('sciInput').value = maxMultiplierStr;
+        convertScientific();
+    } else {
+        // Clear both fields if no scientific notation
+        document.getElementById('sciInput').value = '';
+        document.getElementById('sciResult').textContent = 'Enter a number to convert';
+        document.getElementById('arithmetic1').value = '';
+        document.getElementById('arithmetic2').value = '';
+        document.getElementById('arithmeticOperator').value = '+';
+        document.getElementById('arithmeticResult').textContent = 'Enter both numbers to calculate';
+    }
+}
+
+// Add event listeners for arithmetic calculator
+document.getElementById('arithmetic1').addEventListener('input', calculateArithmetic);
+document.getElementById('arithmetic2').addEventListener('input', calculateArithmetic);
+document.getElementById('arithmeticOperator').addEventListener('change', calculateArithmetic);
+
+function convertScientific() {
+    const input = document.getElementById('sciInput').value.trim();
+    const resultElement = document.getElementById('sciResult');
+    
+    if (!input) {
+        resultElement.textContent = 'Enter a number to convert';
+        // Clear both arithmetic fields when scientific converter is empty
+        document.getElementById('arithmetic1').value = '';
+        document.getElementById('arithmetic2').value = '';
+        return;
+    }
+    
+    try {
+        // Handle scientific notation directly
+        if (input.includes('e+') || input.includes('e-')) {
+            const [coefficient, exponent] = input.split(/e\+|e\-/);
+            const isNegativeExponent = input.includes('e-');
+            const expValue = parseInt(exponent);
+            
+            let coefficientNum = coefficient.replace('.', '');
+            const decimalIndex = coefficient.indexOf('.');
+            const decimalPlaces = decimalIndex === -1 ? 0 : coefficient.length - decimalIndex - 1;
+            
+            let result;
+            
+            if (isNegativeExponent) {
+                // Handle negative exponents (very small numbers)
+                const zerosNeeded = expValue - 1;
+                result = '0.' + '0'.repeat(zerosNeeded) + coefficientNum;
+            } else {
+                // Handle positive exponents (very large numbers)
+                const zerosNeeded = expValue - decimalPlaces;
+                
+                if (zerosNeeded >= 0) {
+                    result = coefficientNum + '0'.repeat(zerosNeeded);
+                } else {
+                    // Need to insert decimal point
+                    const insertIndex = coefficientNum.length + zerosNeeded;
+                    result = coefficientNum.slice(0, insertIndex) + '.' + coefficientNum.slice(insertIndex);
+                }
+            }
+            
+            resultElement.textContent = result;
+
+            // Auto-fill arithmetic field 1 with the Scientific Converter INPUT
+            document.getElementById('arithmetic1').value = input;
+                        
+        } else {
+            // Not scientific notation, just display as is
+            resultElement.textContent = input;
+            
+            // Auto-fill arithmetic field 1 with the input
+            document.getElementById('arithmetic1').value = input;
+            // Auto-fill arithmetic field 2 with the same input (since it's not scientific notation)
+            document.getElementById('arithmetic2').value = input;
+        }
+        
+        // Trigger arithmetic calculation if both fields now have values
+        if (document.getElementById('arithmetic1').value.trim() && document.getElementById('arithmetic2').value.trim()) {
+            calculateArithmetic();
+        }
+        
+    } catch (error) {
+        resultElement.textContent = 'Error converting number: ' + error.message;
+        // Clear arithmetic fields on error
+        document.getElementById('arithmetic1').value = '';
+        document.getElementById('arithmetic2').value = '';
+    }
+}
+
+document.getElementById('sciInput').addEventListener('input', function() {
+    convertScientific();
+});
+
+// Number Repeater function
+function repeatNumber() {
+    const numberInput = document.getElementById('repeatNumber').value;
+    const countInput = document.getElementById('repeatCount').value;
+    const resultElement = document.getElementById('repeatResult');
+    
+    // Extract only digits from number input
+    const digitsOnly = numberInput.replace(/\D/g, '');
+    
+    if (!digitsOnly) {
+        resultElement.textContent = 'Please enter a valid number (digits only)';
+        return;
+    }
+    
+    if (!countInput || countInput < 1) {
+        resultElement.textContent = 'Please enter a valid count (1 or more)';
+        return;
+    }
+    
+    const count = parseInt(countInput);
+    
+    // Repeat the number
+    const repeatedNumber = digitsOnly.repeat(count);
+    
+    resultElement.textContent = `Result: ${repeatedNumber}\n\nLength: ${repeatedNumber.length} digits`;
+}
+
+// Add event listeners for number repeater
+document.getElementById('repeatNumber').addEventListener('input', repeatNumber);
+document.getElementById('repeatCount').addEventListener('input', repeatNumber);
+
+// Entropy Calculator function
+function calculateEntropy() {
+    const input = document.getElementById('entropyInput').value.replace(/\s+/g, '');
+    const resultElement = document.getElementById('entropyResult');
+
+    if (!input) {
+        resultElement.textContent = 'Enter components to calculate entropy';
+        return;
+    }
+
+    try {
+        // ── Character pool detection (for direct string mode) ──
+        function detectPool(str) {
+            let pool = 0;
+            if (/[a-z]/.test(str)) pool += 26;
+            if (/[A-Z]/.test(str)) pool += 26;
+            if (/[0-9]/.test(str)) pool += 10;
+            if (/[^a-zA-Z0-9 ]/.test(str)) pool += 32;
+            return pool;
+        }
+
+        // ── Detect mode: P/D notation vs direct string ──
+        // P/D mode: every token matches pattern like 4P, 143D, 10P etc.
+        const pdMatches = input.match(/\d+[PpDdAaSs]+/g) || [];
+const reconstructedPD = pdMatches.join('');
+const isPD = pdMatches.length > 0 && reconstructedPD === input;
+
+        let totalEntropy = 0;
+        let calculationSteps = [];
+        let stepNumber = 1;
+
+        if (isPD) {
+            // ════════════════════════════════
+            // MODE 1: P/D notation (existing)
+            // ════════════════════════════════
+            calculationSteps.push(`Mode: P/D Notation\n`);
+
+            for (const token of pdMatches) {
+
+                const component = token.toUpperCase();
+
+const match = component.match(/^(\d+)([PDAS]+)$/);
+if (!match) throw new Error(`Invalid component: ${component}`);
+
+const count = parseInt(match[1]);
+const types = match[2];
+
+if (count < 1) throw new Error(`Invalid count: ${component}`);
+
+let pool = 0;
+let poolParts = [];
+
+if (types.includes('P')) {
+    pool += count;
+    poolParts.push(`${count} possibilities`);
+}
+if (types.includes('D')) {
+    pool += 10;
+    poolParts.push(`digits`);
+}
+if (types.includes('A')) {
+    pool += 52;
+    poolParts.push(`alphabets`);
+}
+if (types.includes('S')) {
+    pool += 32;
+    poolParts.push(`symbols`);
+}
+
+const entropy = count * Math.log2(pool);
+totalEntropy += entropy;
+
+calculationSteps.push(`Step ${stepNumber++}: ${component}`);
+calculationSteps.push(`   Pool = ${pool} (${poolParts.join(' + ')})`);
+calculationSteps.push(`   Entropy = ${count} × log₂(${pool}) = ${entropy.toFixed(4)} bits`);
+            }
+
+        } else {
+            // ════════════════════════════════
+            // MODE 2: Direct string (e.g. Ab1*)
+            // ════════════════════════════════
+            const length = input.length;
+            const pool   = detectPool(input);
+
+            if (pool === 0) throw new Error('Could not detect character pool from input');
+
+            // Pool breakdown
+            const hasLower   = /[a-z]/.test(input);
+            const hasUpper   = /[A-Z]/.test(input);
+            const hasDigit   = /[0-9]/.test(input);
+            const hasSymbol  = /[^a-zA-Z0-9 ]/.test(input);
+
+            calculationSteps.push(`Mode: Direct String Analysis\n**${input}**\n`);
+            calculationSteps.push(`Step ${stepNumber++}: Detect character pool`);
+            if (hasLower)  calculationSteps.push(`   + Lowercase letters : 26`);
+            if (hasUpper)  calculationSteps.push(`   + Uppercase letters : 26`);
+            if (hasDigit)  calculationSteps.push(`   + Digits            : 10`);
+            if (hasSymbol) calculationSteps.push(`   + Symbols           : 32`);
+            calculationSteps.push(`   = Total pool size  : ${pool}`);
+
+            calculationSteps.push(`\nStep ${stepNumber++}: String length = ${length} characters`);
+
+            const entropy = length * Math.log2(pool);
+            totalEntropy  = entropy;
+
+            calculationSteps.push(`\nStep ${stepNumber++}: Calculate entropy`);
+            calculationSteps.push(`   Entropy = length × log₂(pool)`);
+            calculationSteps.push(`           = ${length} × log₂(${pool})`);
+            calculationSteps.push(`           = ${length} × ${Math.log2(pool).toFixed(4)}`);
+            calculationSteps.push(`           = ${entropy.toFixed(4)} bits`);
+        }
+
+        // ── Final result ──
+        let resultStr = calculationSteps.join('\n');
+        resultStr += `\n\n--- FINAL RESULT ---\n`;
+        resultStr += `Total Entropy        = ${totalEntropy.toFixed(4)} bits\n`;
+        resultStr += `                     = ${(totalEntropy / 8).toFixed(4)} bytes\n`;
+        resultStr += `                     = ${(totalEntropy / 1024).toFixed(4)} kilobytes\n`;
+        resultStr += `Worst Case Entropy   = ${(totalEntropy / 2.9).toFixed(4)} bits\n`;  // BUG FIXED
+
+        resultElement.innerHTML = resultStr.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+
+    } catch (error) {
+        resultElement.textContent = 'Error: ' + error.message;
+    }
+}
+document.getElementById('entropyInput').addEventListener('input', calculateEntropy);
+(function() {
+  const IDS = ['inputText','additionValue','sciInput','arithmetic1','arithmetic2','repeatNumber','repeatCount','entropyInput'];
+  function save() {
+    const s = {};
+    IDS.forEach(id => { const el = document.getElementById(id); if (el) s[id] = el.value; });
+    s['arithmeticOperator'] = document.getElementById('arithmeticOperator').value;
+    sessionStorage.setItem('da_state', JSON.stringify(s));
+  }
+  IDS.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', save); });
+  document.getElementById('arithmeticOperator').addEventListener('change', save);
+  const raw = sessionStorage.getItem('da_state');
+  if (raw) {
+    const s = JSON.parse(raw);
+    IDS.forEach(id => { const el = document.getElementById(id); if (el && s[id] !== undefined) el.value = s[id]; });
+    if (s['arithmeticOperator']) document.getElementById('arithmeticOperator').value = s['arithmeticOperator'];
+  }
+})();
+
+
+
+
+  //  ===========  11-6-2026  CLAUDE && BASE_INTERPRETOR_APK,Digit_Analyst_APK
+  //  ===========  5-6-2026  CLAUDE 
+  //22-10-2025  &  CLD,CG,CG,CG  8-4-2026
+  //  ===========  5-6-2026  CLAUDE  @  "TOP_AT_RELOAD.html"
+
+
+        updateCalculations();
+
+                            </script>
+
+                                    </body>
+
+                                            </html>
