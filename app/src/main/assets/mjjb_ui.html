@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<script>history.scrollRestoration = 'manual';</script>
+<title>MJJB — Encode / Decode</title>
+<style>
+  /* ── Fonts embedded as system fallbacks (no Google Fonts network call) ── */
+  :root {
+    --bg:       #090c10;
+    --panel:    #0d1117;
+    --border:   #1f2d3d;
+    --accent:   #00d4ff;
+    --accent2:  #ff6b35;
+    --accent3:  #39ff14;
+    --green:    #39ff14;
+    --text:     #c9d1d9;
+    --muted:    #4a5568;
+    --danger:   #ff4444;
+    --radius:   4px;
+    --mono:     'Courier New', Courier, monospace;
+    --body:     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    min-height: 100vh;
+    padding: 20px 14px 40px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: pan-y;
+    position: relative;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,212,255,0.025) 39px, rgba(0,212,255,0.025) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,212,255,0.025) 39px, rgba(0,212,255,0.025) 40px);
+    background-color: var(--bg);
+    pointer-events: none;
+  }
+
+  .container { max-width: 820px; margin: 0 auto; position: relative; }
+
+  /* ─── UI LOCK ─── */
+  #uiLockOverlay {
+    display: none; position: fixed; inset: 0; z-index: 9999;
+    background: rgba(9,12,16,0.75); backdrop-filter: blur(1.1px);
+    cursor: not-allowed;
+  }
+  #uiLockOverlay.active { display: block; }
+
+  /* ─── HEADER ─── */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px;
+    position: relative; overflow: hidden;
+  }
+  /* APK LOGO (blue) — top right of header */
+  .apk-logo {
+    margin-left: auto; width: 44px; height: 44px;
+    flex-shrink: 0;
+  }
+  .logo {
+    font-family: var(--mono); font-size: 26px; color: var(--accent);
+    letter-spacing: 6px; text-shadow: 0 0 20px rgba(0,212,255,0.5);
+  }
+  .logo span { color: var(--accent2); }
+  .tagline {
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    letter-spacing: 2px; margin-top: 4px;
+  }
+
+  /* ─── HEADER background logo (green) ─── */
+  .header-bg-logo {
+    position: absolute; right: 60px; top: -20px;
+    width: 100px; height: 120px; opacity: 0.18;
+    pointer-events: none; user-select: none;
+    transform: rotate(89deg);
+  }
+
+  /* ─── STATUS DOT ─── */
+  .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-text { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+
+  /* ─── PANELS ─── */
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 14px; position: relative;
+  }
+  .panel-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 3px;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ─── FILE BUTTON ─── */
+  .file-btn {
+    width: 100%; padding: 28px 20px; border: 2px dashed var(--border);
+    border-radius: var(--radius); background: none; color: var(--muted);
+    font-family: var(--mono); font-size: 13px; letter-spacing: 1px;
+    cursor: pointer; transition: all .25s; text-align: center;
+  }
+  .file-btn:hover, .file-btn:active { border-color: var(--accent); background: rgba(0,212,255,0.04); color: var(--accent); }
+  .file-btn .drop-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+  .file-info {
+    display: none; margin-top: 10px; background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.2); border-radius: var(--radius);
+    padding: 10px 12px; font-family: var(--mono); font-size: 12px;
+  }
+  .file-info.show { display: block; }
+  .file-info .fname { color: var(--accent); word-break: break-all; }
+  .file-info .fsize { color: var(--muted); margin-top: 3px; }
+  .file-warn { color: var(--danger); font-size: 12px; margin-top: 6px; display: none; font-family: var(--mono); }
+
+  /* ─── KEYS ─── */
+  .keys-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-group { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; }
+
+  input[type=text], input[type=number], textarea {
+    background: #0a0f17; border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--accent);
+    font-family: var(--mono); font-size: 14px; padding: 10px 12px;
+    outline: none; letter-spacing: 2px; transition: border-color .2s; width: 100%;
+    -webkit-appearance: none;
+  }
+  textarea#key1, textarea#key2 {
+    height: 42px; resize: none; overflow-x: auto; overflow-y: hidden;
+    white-space: nowrap; line-height: 1.4;
+    -webkit-overflow-scrolling: touch;
+  }
+  input[type=text]:focus, input[type=number]:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,255,0.1); }
+  input[type=text].invalid, textarea.invalid { border-color: var(--danger); box-shadow: 0 0 0 2px rgba(255,68,68,0.15); }
+  input[type=text].valid-key, textarea.valid-key { border-color: rgba(57,255,20,0.4); }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  .key-invalid-banner {
+    display: none; align-items: center; gap: 6px; margin-top: 5px;
+    padding: 5px 8px; background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.4);
+    border-radius: var(--radius); font-family: var(--mono); font-size: 10px; color: var(--danger); letter-spacing: 1px;
+  }
+  .key-invalid-banner.show { display: flex; }
+
+  /* ─── BLOCK SIZE + BASE CHIPS ─── */
+  .block-row { display: flex; align-items: flex-start; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+  .base-stack { display: flex; flex-direction: row; gap: 12px; user-select: none; margin-top: 20px; }
+  .base-chip {
+    width: 72px; padding: 4px 8px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: #0a0f17;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+    text-align: center; cursor: pointer; transition: all .2s; position: relative;
+  }
+  .base-chip .chip-label { font-size: 9px; letter-spacing: 2px; color: var(--muted); margin-bottom: 3px; }
+  .base-chip .chip-val   { font-size: 12px; font-weight: bold; }
+  .base-chip.chip-dec { border-color: rgba(0,212,255,0.4); }
+  .base-chip.chip-dec .chip-val { color: var(--accent); }
+  .base-chip.chip-oct { border-color: rgba(255,107,53,0.4); }
+  .base-chip.chip-oct .chip-val { color: var(--accent2); }
+  .base-chip.active-swap { background: rgba(57,255,20,0.08); border-color: var(--green); }
+
+  /* ─── STRUCTURE ─── */
+  .structure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .struct-option { position: relative; }
+  .struct-option input[type=radio] { display: none; }
+  .struct-card {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 12px 6px; border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: all .2s; text-align: center; user-select: none;
+  }
+  .struct-card:hover { border-color: var(--accent); background: rgba(0,212,255,0.04); }
+  .struct-option input:checked + .struct-card {
+    border-color: var(--accent); background: rgba(0,212,255,0.08);
+    box-shadow: 0 0 12px rgba(0,212,255,0.15);
+  }
+  .struct-seq { font-family: var(--mono); font-size: 10px; color: var(--accent); letter-spacing: 1px; margin-bottom: 4px; }
+  .op-e { color: var(--accent3); }
+  .op-s { color: var(--accent2); }
+
+  /* ─── MODE ─── */
+  .mode-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .mode-btn {
+    flex: 1; padding: 10px 6px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: none; color: var(--muted); font-family: var(--mono); font-size: 11px;
+    letter-spacing: 2px; cursor: pointer; transition: all .2s; text-transform: uppercase;
+    min-width: 80px;
+  }
+  .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .mode-btn.active { background: rgba(0,212,255,0.1); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 10px rgba(0,212,255,0.2); }
+  .mode-btn.active.decode { background: rgba(255,107,53,0.1); border-color: var(--accent2); color: var(--accent2); box-shadow: 0 0 10px rgba(255,107,53,0.2); }
+  .mode-auto-tag { font-family: var(--mono); font-size: 10px; color: var(--muted); border: 1px dashed var(--muted); padding: 3px 7px; border-radius: 2px; letter-spacing: 1px; display: none; }
+
+  /* ─── RUN BUTTON ─── */
+  .run-btn {
+    width: 100%; padding: 16px; background: transparent; border: 2px solid var(--accent);
+    border-radius: var(--radius); color: var(--accent); font-family: var(--mono);
+    font-size: 15px; letter-spacing: 4px; cursor: pointer; text-transform: uppercase;
+    transition: all .25s; position: relative; overflow: hidden;
+  }
+  .run-btn:active { background: rgba(0,212,255,0.15); }
+  .run-btn:disabled { border-color: var(--muted); color: var(--muted); cursor: not-allowed; }
+  .run-btn.decode-mode { border-color: var(--accent2); color: var(--accent2); }
+  .run-btn.decode-mode:active { background: rgba(255,107,53,0.15); }
+
+  /* ─── PROGRESS ─── */
+  .progress-panel { display: none; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
+  .progress-panel.show { display: block; }
+  .prog-status { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-bottom: 10px; min-height: 16px; }
+  .prog-status::before { content: '> '; color: var(--green); }
+  .prog-bar-track { height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-bottom: 10px; border: 1px solid var(--border); }
+  .prog-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #00ffcc); border-radius: 4px; transition: width .4s linear; box-shadow: 0 0 8px rgba(0,212,255,0.6); }
+  .prog-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-family: var(--mono); font-size: 10px; }
+  @media (max-width: 480px) { .prog-stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat-box { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 8px; }
+  .stat-label { color: var(--muted); font-size: 9px; letter-spacing: 2px; margin-bottom: 3px; }
+  .stat-value { color: var(--accent); font-size: 12px; }
+  .stat-value.speed { color: var(--green); }
+
+  /* ─── DOWNLOAD / SHARE ─── */
+  .download-area {
+    display: none; margin-top: 12px; padding: 14px;
+    background: rgba(57,255,20,0.05); border: 1px solid rgba(57,255,20,0.3);
+    border-radius: var(--radius); align-items: center; gap: 12px;
+  }
+  .download-area.show { display: flex; }
+  .download-icon { font-size: 22px; }
+  .download-info { flex: 1; }
+  .download-info .dname { font-family: var(--mono); font-size: 11px; color: var(--green); word-break: break-all; }
+  .download-info .dsize { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .download-btn {
+    padding: 9px 16px; background: rgba(57,255,20,0.1); border: 1px solid var(--green);
+    border-radius: var(--radius); color: var(--green); font-family: var(--mono);
+    font-size: 11px; letter-spacing: 2px; cursor: pointer; text-decoration: none;
+    transition: all .2s; text-shadow: 0 0 8px var(--green);
+  }
+  .download-btn:active { background: rgba(57,255,20,0.25); }
+
+  /* ─── ERROR ─── */
+  .error-box { display: none; background: rgba(255,68,68,0.07); border: 1px solid rgba(255,68,68,0.3); border-radius: var(--radius); padding: 10px 12px; font-family: var(--mono); font-size: 11px; color: var(--danger); margin-top: 8px; }
+  .error-box.show { display: block; }
+
+  /* ─── FOOTER ─── */
+  footer { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 12px; font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; line-height: 1.8; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 480px) {
+    .keys-row { grid-template-columns: 1fr; }
+    .structure-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ══════════════════════════════════════════
+     FILE MANAGER OVERLAY
+  ══════════════════════════════════════════ */
+  #fmOverlay {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background: rgba(9,12,16,0.97); backdrop-filter: blur(3px);
+    flex-direction: column; overflow: hidden;
+  }
+  #fmOverlay.open { display: flex; }
+
+  #fmHeader {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #fmTitle { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: 3px; flex: 1; }
+  #fmClose {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: var(--mono); font-size: 12px; padding: 6px 12px;
+    border-radius: var(--radius); cursor: pointer; letter-spacing: 1px;
+  }
+  #fmClose:active { border-color: var(--danger); color: var(--danger); }
+
+  /* Tabs: ENCODED / DECODED */
+  #fmTabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .fm-tab {
+    flex: 1; padding: 10px; text-align: center;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+    color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .2s; user-select: none;
+  }
+  .fm-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .fm-tab.active.decode-tab { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* Type chips */
+  #fmTypes {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .fm-type-chip {
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 2px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+    color: var(--muted); cursor: pointer; transition: all .18s; user-select: none;
+  }
+  .fm-type-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.07); }
+  .fm-type-chip.active.t-decode { border-color: var(--accent2); color: var(--accent2); background: rgba(255,107,53,0.07); }
+
+  /* File list */
+  #fmList { flex: 1; overflow-y: auto; padding: 6px 0; -webkit-overflow-scrolling: touch; }
+  .fm-empty { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: center; padding: 40px 20px; letter-spacing: 1px; }
+
+  .fm-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid rgba(31,45,61,0.5);
+    transition: background .15s;
+  }
+  .fm-row:active { background: rgba(0,212,255,0.04); }
+  .fm-fname {
+    flex: 1; font-family: var(--mono); font-size: 12px; color: var(--text);
+    word-break: break-all; cursor: pointer; line-height: 1.4;
+  }
+  .fm-fname:active { color: var(--accent); }
+  .fm-meta { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .fm-btn {
+    flex-shrink: 0; background: none; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 7px 9px; font-size: 15px;
+    cursor: pointer; transition: all .18s; line-height: 1;
+  }
+  .fm-btn.del:active  { border-color: var(--danger); background: rgba(255,68,68,0.1); }
+  .fm-btn.dl:active   { border-color: var(--green);  background: rgba(57,255,20,0.1); }
+
+  /* In-app viewer/player/editor panels */
+  #fmViewer {
+    display: none; position: fixed; inset: 0; z-index: 10100;
+    background: #000; flex-direction: column;
+  }
+  #fmViewer.open { display: flex; }
+  #fmViewerBar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  #fmViewerTitle { font-family: var(--mono); font-size: 11px; color: var(--accent); flex: 1; word-break: break-all; }
+  #fmViewerClose {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: var(--mono); font-size: 11px; padding: 5px 10px;
+    border-radius: var(--radius); cursor: pointer;
+  }
+  #fmViewerBody { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* Image viewer */
+  #fmImgWrap { flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; padding:10px; }
+  #fmImg { max-width:100%; max-height:100%; object-fit:contain; }
+
+  /* Video / Audio player */
+  #fmMedia { width:100%; flex:1; background:#000; outline:none; }
+  .fm-speed-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+    background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+  }
+  .fm-speed-lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .fm-spd-btn {
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 2px;
+    background: none; font-family: var(--mono); font-size: 11px; color: var(--muted);
+    cursor: pointer; transition: all .15s;
+  }
+  .fm-spd-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.08); }
+
+  /* TXT editor */
+  #fmTxtEditor {
+    flex: 1; background: #0a0f17; color: var(--text);
+    font-family: var(--mono); font-size: 13px; padding: 14px;
+    border: none; outline: none; resize: none; line-height: 1.6;
+    -webkit-appearance: none;
+  }
+  .fm-editor-bar {
+    display: flex; gap: 8px; padding: 8px 14px; flex-wrap: wrap;
+    background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .fm-editor-btn {
+    padding: 5px 11px; border: 1px solid var(--border); border-radius: 2px;
+    background: none; font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+  }
+  .fm-editor-btn:active { border-color: var(--accent); color: var(--accent); }
+  .fm-editor-btn.save-btn { border-color: var(--green); color: var(--green); }
+  .fm-editor-btn.save-btn:active { background: rgba(57,255,20,0.12); }
+  #fmEditorStatus { font-family: var(--mono); font-size: 10px; color: var(--muted); padding: 4px 14px 6px; flex-shrink: 0; background: var(--panel); }
+
+  /* WebView iframe (HTML files) */
+  #fmWebFrame { flex:1; border:none; width:100%; background:#fff; }
+</style>
+</head>
+<body>
+<div id="uiLockOverlay"></div>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <div class="logo">MJ<span>JB</span></div>
+      <div class="tagline">ENCODE / DECODE CIPHER</div>
+    </div>
+  </header>
+
+  <div class="status-row">
+    <div class="dot green" id="dot1"></div>
+    <span class="status-text">MJJB ENGINE READY</span>
+  </div>
+
+  <!-- FILE SELECT -->
+  <div class="panel">
+    <div class="panel-label">01 — INPUT FILE</div>
+    <button class="file-btn" id="fileBtn" onclick="pickFile()">
+      <span class="drop-icon">⬡</span>
+      TAP TO SELECT FILE
+    </button>
+    <div class="file-info" id="fileInfo">
+      <div class="fname" id="fileName"></div>
+      <div class="fsize" id="fileSize"></div>
+    </div>
+    <div class="file-warn" id="fileWarn"></div>
+  </div>
+
+  <!-- KEYS -->
+  <div class="panel">
+    <div class="panel-label">02 — ENCRYPTION KEYS (alphanumeric)</div>
+    <div class="keys-row">
+      <div class="field-group">
+        <div class="field-label">KEY 1</div>
+        <textarea id="key1" placeholder="e.g. ABCD123e" autocomplete="off" autocorrect="off" spellcheck="false" rows="1"></textarea>
+        <div class="key-invalid-banner" id="key1Banner">⚠ Alphanumeric only (A-Z, a-z, 0-9)</div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">KEY 2</div>
+        <textarea id="key2" placeholder="e.g. ABCD123j" autocomplete="off" autocorrect="off" spellcheck="false" rows="1"></textarea>
+        <div class="key-invalid-banner" id="key2Banner">⚠ Alphanumeric only (A-Z, a-z, 0-9)</div>
+      </div>
+    </div>
+    <div class="block-row">
+      <div>
+        <div class="field-label" style="margin-bottom:6px;">BLOCK SIZE (bytes)</div>
+        <input type="number" id="blockSize" value="65" min="57" max="56789"
+               style="width:150px;" oninput="updateRunBtn()"/>
+      </div>
+      <div class="base-stack">
+        <div class="base-chip chip-dec" id="chip0" onclick="swapChips()">
+          <div class="chip-label">K1</div>
+          <div class="chip-val" id="chip0val">DEC</div>
+        </div>
+        <div class="base-chip chip-oct" id="chip1" onclick="swapChips()">
+          <div class="chip-label">K2</div>
+          <div class="chip-val" id="chip1val">OCT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STRUCTURE -->
+  <div class="panel">
+    <div class="panel-label">03 — ENCODING STRUCTURE</div>
+    <div class="structure-grid">
+      <label class="struct-option">
+        <input type="radio" name="structure" value="0" checked/>
+        <div class="struct-card">
+          <div class="struct-seq">
+            <span class="op-e">E</span>(K1) →
+            <span class="op-e">E</span>(K2) →
+            <span class="op-s">S</span>(K1,K2)
+          </div>
+        </div>
+      </label>
+
+      <label class="struct-option">
+        <input type="radio" name="structure" value="1"/>
+        <div class="struct-card">
+          <div class="struct-seq">
+            <span class="op-e">E</span>(K1) →
+            <span class="op-s">S</span>(K2,K1) →
+            <span class="op-e">E</span>(K1)
+          </div>
+        </div>
+      </label>
+
+      <label class="struct-option">
+        <input type="radio" name="structure" value="2"/>
+        <div class="struct-card">
+          <div class="struct-seq">
+            <span class="op-s">S</span>(K1,K2) →
+            <span class="op-e">E</span>(K2) →
+            <span class="op-e">E</span>(K1)
+          </div>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <!-- MODE -->
+  <div class="panel">
+    <div class="panel-label">04 — OPERATION MODE</div>
+    <div class="mode-row">
+      <button class="mode-btn" id="modeAuto"   onclick="setMode('auto')">⟳ AUTO</button>
+      <button class="mode-btn active" id="modeEncode" onclick="setMode('encode')">▲ ENCODE</button>
+      <button class="mode-btn decode" id="modeDecode" onclick="setMode('decode')">▼ DECODE</button>
+      <div class="mode-auto-tag" id="autoTag">AUTO: <span id="autoTagVal">—</span></div>
+    </div>
+  </div>
+
+  <!-- RUN -->
+  <button class="run-btn" id="runBtn" onclick="runProcess()" disabled>
+    <span id="runBtnText">▲ ENCODE FILE</span>
+  </button>
+
+  <!-- PROGRESS -->
+  <div class="progress-panel" id="progressPanel">
+    <div class="panel-label">PROCESSING</div>
+    <div class="prog-status" id="progStatus">Initializing...</div>
+    <div class="prog-bar-track"><div class="prog-bar-fill" id="progBar"></div></div>
+    <div class="prog-stats">
+      <div class="stat-box"><div class="stat-label">PROGRESS</div><div class="stat-value" id="statPct">0%</div></div>
+      <div class="stat-box"><div class="stat-label">BLOCKS</div><div class="stat-value" id="statBlocks">0/0</div></div>
+      <div class="stat-box"><div class="stat-label">PROCESSED</div><div class="stat-value" id="statBytes">0 B</div></div>
+      <div class="stat-box"><div class="stat-label" id="etaLabel">ETA</div><div class="stat-value" id="statEta">—</div></div>
+    </div>
+    <div class="download-area" id="downloadArea">
+      <div class="download-icon">✓</div>
+      <div class="download-info">
+        <div class="dname" id="downloadName"></div>
+        <div class="dsize">Tap to Save / Share</div>
+      </div>
+      <button class="download-btn" onclick="shareOutput()">↓ SAVE</button>
+    </div>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       FILE MANAGER OVERLAY
+  ══════════════════════════════════════════ -->
+  <div id="fmOverlay">
+    <div id="fmHeader">
+      <span id="fmTitle">◈ FILE MANAGER</span>
+      <button id="fmClose" onclick="fmClose()">✕ CLOSE</button>
+    </div>
+    <!-- ENCODED / DECODED tabs -->
+    <div id="fmTabs">
+      <div class="fm-tab active"        id="fmTabEnc" onclick="fmSetTab('enc')">▲ ENCODED</div>
+      <div class="fm-tab decode-tab"    id="fmTabDec" onclick="fmSetTab('dec')">▼ DECODED</div>
+    </div>
+    <!-- File-type chips -->
+    <div id="fmTypes"></div>
+    <!-- File rows -->
+    <div id="fmList"></div>
+  </div>
+
+  <!-- In-app viewer / player / editor -->
+  <div id="fmViewer">
+    <div id="fmViewerBar">
+      <span id="fmViewerTitle"></span>
+      <button id="fmViewerClose" onclick="fmViewerClose()">✕</button>
+    </div>
+    <div id="fmViewerBody">
+      <!-- Image -->
+      <div id="fmImgWrap"  style="display:none;"><img id="fmImg" src=""/></div>
+      <!-- Video -->
+      <video id="fmVideo"  style="display:none;" class="fm-media" controls playsinline></video>
+      <!-- Audio -->
+      <audio id="fmAudio"  style="display:none;" class="fm-media" controls></audio>
+      <!-- Speed row (video + audio) -->
+      <div class="fm-speed-row" id="fmSpeedRow" style="display:none;">
+        <span class="fm-speed-lbl">SPEED:</span>
+        <button class="fm-spd-btn" onclick="fmSetSpeed(0.25)">0.25×</button>
+        <button class="fm-spd-btn" onclick="fmSetSpeed(0.5)">0.5×</button>
+        <button class="fm-spd-btn" onclick="fmSetSpeed(0.75)">0.75×</button>
+        <button class="fm-spd-btn active" onclick="fmSetSpeed(1)">1×</button>
+        <button class="fm-spd-btn" onclick="fmSetSpeed(1.25)">1.25×</button>
+        <button class="fm-spd-btn" onclick="fmSetSpeed(1.5)">1.5×</button>
+        <button class="fm-spd-btn" onclick="fmSetSpeed(2)">2×</button>
+        <button class="fm-spd-btn" onclick="fmSetSpeed(3)">3×</button>
+      </div>
+      <!-- TXT editor -->
+      <textarea id="fmTxtEditor" style="display:none;" spellcheck="false"></textarea>
+      <div class="fm-editor-bar" id="fmEditorBar" style="display:none;">
+        <button class="fm-editor-btn" onclick="fmEditorUpper()">UPPER</button>
+        <button class="fm-editor-btn" onclick="fmEditorLower()">lower</button>
+        <button class="fm-editor-btn" onclick="fmEditorTrim()">TRIM</button>
+        <button class="fm-editor-btn" onclick="fmEditorCopy()">COPY</button>
+        <button class="fm-editor-btn save-btn" onclick="fmEditorSave()">💾 SAVE</button>
+      </div>
+      <div id="fmEditorStatus" style="display:none;"></div>
+      <!-- HTML WebView -->
+      <iframe id="fmWebFrame" style="display:none;" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+  </div>
+
+  <footer style="text-align:center;">
+    © <span id="footerYear" style="font-size:1.34em;font-weight:606;cursor:pointer;user-select:none;" title="File Manager" onclick="fmOpen()"></span> <br>
+    <a href="Digit_Analyst_APK.html" style="color:var(--muted);text-decoration:none;letter-spacing:1px;" onclick="saveState();this.style.color='var(--accent)'">VAGHASIYA OM VIRALBHAI</a> <br>
+    <a href="BASE_INTERPRETOR_APK.html" style="color:var(--muted);text-decoration:none;letter-spacing:1px;" onclick="saveState();this.style.color='var(--accent2)'">MOTI-JIMMY-JEBO-BOOSHIYAA</a>
+  </footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// ANDROID BRIDGE WRAPPER
+// All calls go through window.Android (the Java MjjbBridge)
+// ═══════════════════════════════════════════════════════
+const A = window.Android; // injected by WebView
+
+// ─── Called by MainActivity when user picks a file ───
+// absPath = native file path, displayName = original filename, size = bytes
+window.androidDeliverFile = function(absPath, displayName, size) {
+  selectedFilePath = absPath;
+  selectedFileName = displayName;
+  selectedFileSize = size;
+
+  document.getElementById('fileName').textContent = '📄 ' + displayName;
+  document.getElementById('fileSize').textContent  = 'Size: ' + fmtBytes(size);
+  document.getElementById('fileInfo').classList.add('show');
+  document.getElementById('progressPanel').classList.remove('show');
+
+  setMode('auto');
+  const keysPanel = document.querySelector('.panel-label');
+  const allLabels = document.querySelectorAll('.panel-label');
+  const keysEl = [...allLabels].find(el => el.textContent.includes('02'));
+  if (keysEl) {
+    const top = keysEl.parentElement.getBoundingClientRect().top + window.scrollY - 09;
+    window.scrollTo({ top, behavior: 'smooth' });
+  }
+};
+
+// ─── State ───
+let currentMode      = 'encode';
+let selectedFilePath = null;
+let selectedFileName = null;
+let selectedFileSize = 0;
+let pollInterval     = null;
+let outputFilename   = null;
+
+// Lock / Unlock UI during processing
+function lockUI()   { document.getElementById('uiLockOverlay').classList.add('active');    }
+function unlockUI() { document.getElementById('uiLockOverlay').classList.remove('active'); }
+
+// Open native file picker
+function pickFile() { A.pickFile(); }
+
+// Share / save output via Android share sheet
+function shareOutput() { A.shareOutput(); }
+
+// ─── KEY VALIDATION ───
+function validateKey(inputId, bannerId) {
+  const input  = document.getElementById(inputId);
+  const banner = document.getElementById(bannerId);
+  const val    = input.value;
+  const allValid = /^[a-zA-Z0-9]*$/.test(val);
+  if (val.length === 0) {
+    input.classList.remove('invalid','valid-key'); banner.classList.remove('show');
+  } else if (!allValid) {
+    input.classList.add('invalid'); input.classList.remove('valid-key'); banner.classList.add('show');
+  } else {
+    input.classList.remove('invalid'); input.classList.add('valid-key'); banner.classList.remove('show');
+  }
+  updateRunBtn();
+}
+document.getElementById('key1').addEventListener('input', () => validateKey('key1','key1Banner'));
+document.getElementById('key2').addEventListener('input', () => validateKey('key2','key2Banner'));
+document.getElementById('key1').addEventListener('input', validateAll);
+document.getElementById('key2').addEventListener('input', validateAll);
+document.getElementById('blockSize').addEventListener('input', validateAll);
+
+// ENTER = switch between KEY1 <-> KEY2 (PC + Mobile)
+document.getElementById('key1').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('key2').focus();
+  }
+});
+
+document.getElementById('key2').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('key1').focus();
+  }
+});
+
+function isKeyValid(id) {
+  const v = document.getElementById(id).value;
+  return v.length > 0 && /^[a-zA-Z0-9]+$/.test(v);
+}
+
+// ─── MODE ───
+function setMode(m) {
+  currentMode = m;
+  ['modeAuto','modeEncode','modeDecode'].forEach(id => {
+    document.getElementById(id).classList.remove('active','decode');
+  });
+  const map = { auto:'modeAuto', encode:'modeEncode', decode:'modeDecode' };
+  const btn = document.getElementById(map[m]);
+  btn.classList.add('active');
+  if (m === 'decode') btn.classList.add('decode');
+  refreshAutoMode(() => { updateAutoTag(); updateRunBtn(); });
+}
+
+// Probe via native — works entirely offline
+let _cachedAutoMode = 'encode';
+function refreshAutoMode(callback) {
+  if (currentMode !== 'auto' || !selectedFilePath) {
+    _cachedAutoMode = (currentMode === 'decode') ? 'decode' : 'encode';
+    if (callback) callback();
+    return;
+  }
+  try {
+    const isMjjb = A.probeIsMjjb(selectedFilePath);
+    _cachedAutoMode = isMjjb ? 'decode' : 'encode';
+  } catch(e) { _cachedAutoMode = 'encode'; }
+  if (callback) callback();
+}
+
+function getEffectiveMode() {
+  return (currentMode !== 'auto') ? currentMode : _cachedAutoMode;
+}
+
+function updateAutoTag() {
+  const tag = document.getElementById('autoTag');
+  if (currentMode === 'auto' && selectedFilePath) {
+    document.getElementById('autoTagVal').textContent = _cachedAutoMode.toUpperCase();
+    tag.style.display = 'block';
+  } else {
+    tag.style.display = 'none';
+  }
+}
+
+// ─── BASE CHIP SWAP (tap to swap DEC/OCT) ───
+let chipBases = ['dec','oct'];
+function swapChips() {
+  [chipBases[0], chipBases[1]] = [chipBases[1], chipBases[0]];
+  refreshChipUI();
+}
+function refreshChipUI() {
+  [0,1].forEach(i => {
+    const chip = document.getElementById('chip' + i);
+    const val  = document.getElementById('chip' + i + 'val');
+    const isDec = chipBases[i] === 'dec';
+    val.textContent = isDec ? 'DEC' : 'OCT';
+    chip.className  = 'base-chip ' + (isDec ? 'chip-dec' : 'chip-oct');
+    chip.querySelector('.chip-label').textContent = 'K' + (i+1);
+  });
+}
+refreshChipUI();
+
+// ─── VALIDATE + UPDATE RUN BUTTON ───
+function validateAll() {
+  const btn  = document.getElementById('runBtn');
+  const txt  = document.getElementById('runBtnText');
+  const warn = document.getElementById('fileWarn');
+  const mode = getEffectiveMode();
+  const k1ok = isKeyValid('key1');
+  const k2ok = isKeyValid('key2');
+  const bs   = parseInt(document.getElementById('blockSize').value) || 0;
+
+  let warnMsg = '';
+  if (selectedFilePath) {
+    if (selectedFileSize < 65)         warnMsg = '⚠ File must be at least 65 bytes';
+    else if (bs < 57 || bs > 56789)    warnMsg = '⚠ Block size must be 57–56789 bytes';
+    else if (bs >= selectedFileSize)   warnMsg = '⚠ Block size must be < file size';
+  }
+  warn.textContent   = warnMsg;
+  warn.style.display = warnMsg ? 'block' : 'none';
+
+  const ok = selectedFilePath && k1ok && k2ok && !warnMsg && bs >= 57 && bs <= 56789;
+  btn.disabled  = !ok;
+  btn.className = 'run-btn' + (mode === 'decode' ? ' decode-mode' : '');
+
+  if (!selectedFilePath)     txt.textContent = '🗃️ SELECT FILE !';
+  else if (!k1ok || !k2ok)   txt.textContent = '🔑 FILL BOTH KEYS !';
+  else if (warnMsg)          txt.textContent = '⚠ FIX ERROR';
+  else txt.textContent = mode === 'decode' ? '🔓 DECODE FILE' : '🔒 ENCODE FILE';
+}
+function updateRunBtn() { validateAll(); }
+
+// ─── RUN PROCESS ───
+function runProcess() {
+  if (!selectedFilePath) return;
+  if (!isKeyValid('key1') || !isKeyValid('key2')) return;
+
+  const k1   = document.getElementById('key1').value;
+  const k2   = document.getElementById('key2').value;
+  const st   = document.querySelector('input[name="structure"]:checked').value;
+  const bs   = parseInt(document.getElementById('blockSize').value);
+  const mode = getEffectiveMode();
+
+  // Reset UI
+  document.getElementById('progressPanel').classList.add('show');
+  document.getElementById('downloadArea').classList.remove('show');
+  document.getElementById('errorBox').classList.remove('show');
+  document.getElementById('progBar').style.width = '0%';
+  document.getElementById('progStatus').textContent = 'Starting NDK engine...';
+  document.getElementById('statPct').textContent    = '0%';
+  document.getElementById('statBlocks').textContent = '0/0';
+  document.getElementById('statBytes').textContent  = '0 B';
+  document.getElementById('statEta').textContent    = '—';
+  document.getElementById('statEta').className      = 'stat-value';
+  document.getElementById('etaLabel').textContent   = 'ETA';
+  document.getElementById('runBtn').disabled        = true;
+  lockUI();
+
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+  try {
+    // Call native engine — this returns the output filename and starts a background thread
+    const result = A.startProcess(
+      selectedFilePath, k1, k2,
+      chipBases[0], chipBases[1],
+      parseInt(st), bs, mode);
+
+    if (result && result.startsWith('ERROR')) {
+      unlockUI();
+      showError(result);
+      document.getElementById('runBtn').disabled = false;
+      updateRunBtn();
+      return;
+    }
+
+    outputFilename = result;
+    startPolling();
+  } catch(e) {
+    unlockUI();
+    showError('Bridge error: ' + e.message);
+    document.getElementById('runBtn').disabled = false;
+    updateRunBtn();
+  }
+}
+
+// ─── POLLING (reads NDK progress via bridge) ───
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(pollProgress, 500);
+}
+
+function pollProgress() {
+  try {
+    const data = JSON.parse(A.getProgress());
+    document.getElementById('progStatus').textContent   = data.status;
+    document.getElementById('progBar').style.width       = data.percent.toFixed(1) + '%';
+    document.getElementById('statPct').textContent       = data.percent.toFixed(1) + '%';
+    document.getElementById('statBlocks').textContent    = data.done_blocks + '/' + data.total_blocks;
+    document.getElementById('statBytes').textContent     = fmtBytes(data.done_bytes);
+
+    if (data.finished) {
+      clearInterval(pollInterval);
+      const etaEl   = document.getElementById('statEta');
+      const labelEl = document.getElementById('etaLabel');
+      labelEl.textContent = 'SPEED';
+      etaEl.textContent   = (data.mbps > 0) ? data.mbps.toFixed(1) + ' MB/s' : '—';
+      etaEl.className     = 'stat-value speed';
+
+      unlockUI();
+      document.getElementById('runBtn').disabled = false;
+      updateRunBtn();
+
+      if (data.has_error || data.status.startsWith('ERROR')) showError(data.status);
+      else showDownload();
+    } else {
+      document.getElementById('etaLabel').textContent = 'ETA';
+    }
+  } catch(e) {}
+}
+
+function showDownload() {
+  document.getElementById('progBar').style.width = '100%';
+  document.getElementById('statPct').textContent  = '100%';
+  document.getElementById('downloadArea').classList.add('show');
+  document.getElementById('downloadName').textContent = outputFilename || '(output ready)';
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.textContent = msg;
+  box.classList.add('show');
+}
+
+function fmtBytes(b) {
+  if (!b || b === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B','KB','MB','GB','TB'];
+  const i = Math.floor(Math.log(b) / Math.log(k));
+  return (b / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+}
+// State persistence (Chrome-tab style)
+function saveState() {
+  sessionStorage.setItem('mjjb_state', JSON.stringify({
+    key1: document.getElementById('key1').value,
+    key2: document.getElementById('key2').value,
+    mode: currentMode,
+    blockSize: document.getElementById('blockSize').value,
+    filePath: selectedFilePath,
+    fileName: selectedFileName,
+    fileSize: selectedFileSize,
+    chipBases: chipBases.slice()
+  }));
+}
+function restoreState() {
+  const raw = sessionStorage.getItem('mjjb_state');
+  if (!raw) return;
+  const s = JSON.parse(raw);
+  document.getElementById('key1').value = s.key1 || '';
+  document.getElementById('key2').value = s.key2 || '';
+  document.getElementById('blockSize').value = s.blockSize || 65;
+  if (s.filePath) {
+    selectedFilePath = s.filePath;
+    selectedFileName = s.fileName;
+    selectedFileSize = s.fileSize;
+    document.getElementById('fileName').textContent = '📄 ' + s.fileName;
+    document.getElementById('fileSize').textContent  = 'Size: ' + fmtBytes(s.fileSize);
+    document.getElementById('fileInfo').classList.add('show');
+  }
+  if (s.chipBases) { chipBases[0] = s.chipBases[0]; chipBases[1] = s.chipBases[1]; refreshChipUI(); }
+  setMode(s.mode || 'encode');
+  validateAll();
+}
+// Init
+restoreState();
+const logoEl = document.createElement('img');
+logoEl.src = 'MJMJJB.white.svg';
+logoEl.style.cssText = `
+  position: absolute;
+  left: 59%;
+  top: -54px;
+  width: 134px;
+  height: 197px;
+  rotate: 89deg;
+  opacity: 1.1;
+  pointer-events: none;
+  z-index: 0;
+  user-select: none;
+`;
+document.body.appendChild(logoEl);
+document.getElementById('footerYear').textContent = new Date().getFullYear();
+
+
+// ══════════════════════════════════════════════════════════════════
+  // FILE MANAGER
+  // ══════════════════════════════════════════════════════════════════
+  const FM_EXT = {
+    images: ['jpg','jpeg','png','gif','webp','bmp','svg'],
+    videos: ['mp4','mkv','webm','3gp','m4v','ts'],
+    audio:  ['mp3','aac','m4a','wav','ogg','flac','opus'],
+    html:   ['html','htm'],
+    pdf:    ['pdf'],
+    txt:    ['txt','log','csv','json','xml'],
+    office: ['docx','xlsx','pptx','doc','xls','ppt','odt','ods','odp'],
+  };
+
+  // MJJB encoded files have the .mjjb extension (or no known extension)
+  // We split output dir into ENCODED (.mjjb) vs DECODED (everything else)
+  let _fmTab      = 'enc';   // 'enc' | 'dec'
+  let _fmType     = 'ALL';
+  let _fmAllFiles = [];      // raw list from bridge
+
+  function fmOpen() {
+    document.getElementById('fmOverlay').classList.add('open');
+    fmRefresh();
+  }
+  function fmClose() {
+    document.getElementById('fmOverlay').classList.remove('open');
+  }
+
+  function fmRefresh() {
+    try {
+      _fmAllFiles = JSON.parse(A.listOutputFiles());
+    } catch(e) { _fmAllFiles = []; }
+    fmBuildTypeChips();
+    fmRender();
+  }
+
+  function fmSetTab(tab) {
+    _fmTab  = tab;
+    _fmType = 'ALL';
+    document.getElementById('fmTabEnc').classList.toggle('active', tab === 'enc');
+    document.getElementById('fmTabDec').classList.toggle('active', tab === 'dec');
+    fmBuildTypeChips();
+    fmRender();
+  }
+
+  function fmTabFiles() {
+    return _fmAllFiles.filter(f => {
+      const isEnc = fmIsEncoded(f.name);
+      if (_fmTab === 'enc') return isEnc;
+      else return !isEnc;
+    });
+  }
+
+  // ENCODED = second-last dot-segment is "mjjb"  (e.g. file.mjjb.png)
+  // DECODED = second-last dot-segment is NOT "mjjb"  (e.g. file.png)
+  function fmIsEncoded(name) {
+    const parts = name.split('.');
+    if (parts.length < 3) return false;          // needs at least x.mjjb.ext
+    return parts[parts.length - 2].toLowerCase() === 'mjjb';
+  }
+
+  function fmExt(name) {
+    const i = name.lastIndexOf('.');
+    return i >= 0 ? name.slice(i+1).toLowerCase() : '';
+  }
+
+  function fmCategoryOf(name) {
+    const e = fmExt(name);
+    for (const [cat, exts] of Object.entries(FM_EXT)) {
+      if (exts.includes(e)) return cat;
+    }
+    return 'others';
+  }
+
+  function fmBuildTypeChips() {
+    const files   = fmTabFiles();
+    const counts  = { ALL: files.length };
+    files.forEach(f => {
+      const c = fmCategoryOf(f.name);
+      counts[c] = (counts[c] || 0) + 1;
+    });
+    const order = ['ALL','images','videos','audio','html','pdf','txt','office','others'];
+    const wrap  = document.getElementById('fmTypes');
+    wrap.innerHTML = '';
+    order.forEach(cat => {
+      if (!counts[cat]) return;
+      const chip = document.createElement('div');
+      chip.className = 'fm-type-chip' +
+        (cat === _fmType ? ' active' + (_fmTab === 'dec' ? ' t-decode' : '') : '');
+      chip.textContent = cat.toUpperCase() + ' (' + counts[cat] + ')';
+      chip.onclick = () => { _fmType = cat; fmBuildTypeChips(); fmRender(); };
+      wrap.appendChild(chip);
+    });
+  }
+
+  function fmRender() {
+    let files = fmTabFiles();
+    if (_fmType !== 'ALL') {
+      files = files.filter(f => fmCategoryOf(f.name) === _fmType);
+    }
+    const list = document.getElementById('fmList');
+    if (!files.length) {
+      list.innerHTML = '<div class="fm-empty">— NO FILES —</div>';
+      return;
+    }
+    list.innerHTML = '';
+    files.forEach(f => {
+      const row  = document.createElement('div');
+      row.className = 'fm-row';
+
+      const info = document.createElement('div');
+      info.style.flex = '1';
+      info.style.minWidth = '0';
+
+      const fname = document.createElement('div');
+      fname.className = 'fm-fname';
+      fname.textContent = f.name;
+      fname.onclick = () => fmOpenFile(f.name);
+
+      const meta = document.createElement('div');
+      meta.className = 'fm-meta';
+      meta.textContent = fmFmtBytes(f.size) + '  •  ' + fmFmtDate(f.lastModified);
+
+      info.appendChild(fname);
+      info.appendChild(meta);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'fm-btn del';
+      delBtn.textContent = '🗑️';
+      delBtn.title = 'Delete';
+      delBtn.onclick = () => fmDelete(f.name);
+
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'fm-btn dl';
+      dlBtn.textContent = '⬇️';
+      dlBtn.title = 'Download';
+      dlBtn.onclick = () => A.downloadOutputFile(f.name);
+
+      row.appendChild(info);
+      row.appendChild(delBtn);
+      row.appendChild(dlBtn);
+      list.appendChild(row);
+    });
+  }
+
+  function fmDelete(name) {
+    if (!confirm('Delete "' + name + '"?\nThis cannot be undone.')) return;
+    const ok = A.deleteOutputFile(name);
+    if (ok) fmRefresh();
+    else alert('Delete failed.');
+  }
+
+  // ─── Open / view file ───
+  let _fmCurrentMediaEl = null;
+  let _fmCurrentFile    = null;
+
+  function fmOpenFile(name) {
+    const ext = fmExt(name);
+    const cat = fmCategoryOf(name);
+    _fmCurrentFile = name;
+
+    // Build the file:// URL — resolve correct dir from bridge
+    const dir  = A.resolveFileDir(name);
+    const path = 'file://' + dir + '/' + name;
+
+    document.getElementById('fmViewerTitle').textContent = name;
+    fmViewerReset();
+
+    if (cat === 'images') {
+      document.getElementById('fmImgWrap').style.display = 'flex';
+      document.getElementById('fmImg').src = path;
+      fmViewerOpen();
+
+    } else if (cat === 'videos') {
+      const v = document.getElementById('fmVideo');
+      v.src   = path;
+      v.style.display = 'block';
+      document.getElementById('fmSpeedRow').style.display = 'flex';
+      _fmCurrentMediaEl = v;
+      fmViewerOpen();
+
+    } else if (cat === 'audio') {
+      const a = document.getElementById('fmAudio');
+      a.src   = path;
+      a.style.display = 'block';
+      document.getElementById('fmSpeedRow').style.display = 'flex';
+      _fmCurrentMediaEl = a;
+      fmViewerOpen();
+
+    } else if (cat === 'html') {
+      const fr = document.getElementById('fmWebFrame');
+      fr.src   = path;
+      fr.style.display = 'block';
+      fmViewerOpen();
+
+    } else if (cat === 'txt') {
+      // Read via fetch (file:// allowed by WebView settings)
+      fetch(path).then(r => r.text()).then(txt => {
+        const ed = document.getElementById('fmTxtEditor');
+        ed.value = txt;
+        ed.style.display = 'block';
+        document.getElementById('fmEditorBar').style.display    = 'flex';
+        document.getElementById('fmEditorStatus').style.display = 'block';
+        document.getElementById('fmEditorStatus').textContent   = 'Chars: ' + txt.length;
+        ed.addEventListener('input', () => {
+          document.getElementById('fmEditorStatus').textContent = 'Chars: ' + ed.value.length + '  (unsaved)';
+        });
+        fmViewerOpen();
+      }).catch(() => {
+        alert('Cannot read file.');
+      });
+
+    } else {
+      // PDF, office, others → Open With chooser
+      A.openOutputFileWith(name);
+    }
+  }
+
+  function fmViewerOpen()  { document.getElementById('fmViewer').classList.add('open'); }
+  function fmViewerClose() {
+    if (_fmCurrentMediaEl) { _fmCurrentMediaEl.pause(); _fmCurrentMediaEl.src = ''; }
+    document.getElementById('fmViewer').classList.remove('open');
+    fmViewerReset();
+  }
+  function fmViewerReset() {
+    _fmCurrentMediaEl = null;
+    document.getElementById('fmImgWrap').style.display    = 'none';
+    document.getElementById('fmVideo').style.display      = 'none';
+    document.getElementById('fmAudio').style.display      = 'none';
+    document.getElementById('fmSpeedRow').style.display   = 'none';
+    document.getElementById('fmTxtEditor').style.display  = 'none';
+    document.getElementById('fmEditorBar').style.display  = 'none';
+    document.getElementById('fmEditorStatus').style.display = 'none';
+    document.getElementById('fmWebFrame').style.display   = 'none';
+    document.getElementById('fmImg').src = '';
+    document.getElementById('fmWebFrame').src = '';
+  }
+
+  function fmSetSpeed(s) {
+    if (_fmCurrentMediaEl) _fmCurrentMediaEl.playbackRate = s;
+    document.querySelectorAll('.fm-spd-btn').forEach(b => {
+      b.classList.toggle('active', parseFloat(b.textContent) === s);
+    });
+  }
+
+  // ─── TXT Editor helpers ───
+  function fmEditorUpper() { const e = document.getElementById('fmTxtEditor'); e.value = e.value.toUpperCase(); }
+  function fmEditorLower() { const e = document.getElementById('fmTxtEditor'); e.value = e.value.toLowerCase(); }
+  function fmEditorTrim()  { const e = document.getElementById('fmTxtEditor'); e.value = e.value.split('\n').map(l=>l.trim()).join('\n'); }
+  function fmEditorCopy()  { navigator.clipboard && navigator.clipboard.writeText(document.getElementById('fmTxtEditor').value); }
+  function fmEditorWrap(l, r) {
+    const e = document.getElementById('fmTxtEditor');
+    const s = e.selectionStart, en = e.selectionEnd;
+    const v = e.value;
+    e.value = v.slice(0,s) + l + v.slice(s,en) + r + v.slice(en);
+  }
+  function fmEditorSave() {
+    const text = document.getElementById('fmTxtEditor').value;
+    const dir  = A.getOutputPath();
+    // Write back via a data URL trick: create a blob URL, open it
+    // Actually write directly: use a hidden anchor with blob
+    const blob = new Blob([text], {type:'text/plain'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = _fmCurrentFile;
+    a.click();
+    URL.revokeObjectURL(url);
+    document.getElementById('fmEditorStatus').textContent = 'Downloaded — replace the file manually if needed.';
+  }
+
+  // ─── Util ───
+  function fmFmtBytes(b) {
+    if (!b) return '0 B';
+    const k = 1024, s = ['B','KB','MB','GB'];
+    const i = Math.floor(Math.log(b)/Math.log(k));
+    return (b/Math.pow(k,i)).toFixed(1) + ' ' + s[i];
+  }
+  function fmFmtDate(ms) {
+    const d = new Date(ms);
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0') + '  ' +
+      String(d.getHours()).padStart(2,'0') + ':' +
+      String(d.getMinutes()).padStart(2,'0');
+  }
+  //  ===========  12-6-2026  CLAUDE
+  //  ===========  11-6-2026  CLAUDE,CG,CLAUDE && BASE_INTERPRETOR_APK,Digit_Analyst_APK
+  //  ===========  5-6-2026  CLAUDE 
+  //  ===========  5-6-2026  CLAUDE  @  "TOP_AT_RELOAD.html"
+  //  CLAUDE,CLAUDE,CLAUDE,CLAUDE,CLAUDE,CLAUDE,CG,CG,CG,DS
+</script>
+        </body>
+                </html>
